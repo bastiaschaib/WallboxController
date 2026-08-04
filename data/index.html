@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>Wallbox Control</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2338bdf8' d='M13 2 3 14h7l-1 8 10-12h-7l1-8Z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main class="card">
+
+  <header class="card-header">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="currentColor"/>
+      </svg>
+      <h1>Wallbox</h1>
+    </div>
+
+    <span id="chargingState" class="badge idle">
+      <span class="dot"></span>
+      <span class="badge-text" aria-live="polite">Loading&hellip;</span>
+    </span>
+  </header>
+
+  <section class="stats">
+    <div class="stat">
+      <span class="stat-label">Current</span>
+      <span class="stat-value"><span id="currentAmp">--</span> <small>A</small></span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Power</span>
+      <span class="stat-value"><span id="power">--</span> <small>W</small></span>
+    </div>
+  </section>
+
+  <section class="slider-section">
+    <div class="slider-label">
+      <label for="amps">Max. charging current</label>
+      <span class="slider-value"><span id="ampsValue">10</span> A</span>
+    </div>
+    <input type="range" id="amps" min="6" max="16" value="10" step="1">
+    <div class="slider-scale"><span>6 A</span><span>16 A</span></div>
+  </section>
+
+  <section class="actions">
+    <button id="startBtn" class="btn btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="currentColor"/></svg>
+      Apply current
+    </button>
+    <button id="stopBtn" class="btn btn-danger">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg>
+      Stop charging
+    </button>
+  </section>
+
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
