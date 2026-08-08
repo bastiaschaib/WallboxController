@@ -1,16 +1,75 @@
 #include <Arduino.h>
 #include "wallbox.h"
 #include "config.h"
+#include "modbus.h"
 
-// Test values
+// Heidelberg Energy Control Modbus register map, from the manufacturer's
+// official "ModBus-Register-Tabelle" (Heidelberg/Amperfied, Feb 2021).
+namespace {
+  constexpr uint16_t REG_CHARGING_STATE = 5;   // input reg, FC04: 2=A1,3=A2,4=B1,5=B2,6=C1,7=C2,8=derating,9=E,10=F,11=err
+  constexpr uint16_t REG_POWER = 14;           // input reg, FC04, sum of L1-L3, in VA
+  constexpr uint16_t REG_MAX_CURRENT = 261;    // holding reg, FC03/FC06, 0.1A steps, 0 or 60-160
+
+  // Only state 7 (C2 = vehicle plugged, requesting, wallbox allows) means current is actually flowing.
+  constexpr uint16_t STATE_C2_CHARGING = 7;
+}
+
 bool charging = false;
 int currentAmp = 0;
 int power = 0;
+bool online = false;
+
+static int targetAmp = 0; // last commanded setpoint; re-sent periodically to hold the wallbox's Modbus watchdog open
+
+static unsigned long lastPollMs = 0;
+static unsigned long lastWatchdogRefreshMs = 0;
+
+static void onChargingStateResult(bool success, uint16_t value) {
+  online = success;
+  if (success) {
+    charging = (value == STATE_C2_CHARGING);
+  }
+}
+
+static void onPowerResult(bool success, uint16_t value) {
+  online = success;
+  if (success) {
+    power = value;
+  }
+}
+
+static void writeCurrentSetpoint() {
+  uint16_t deciamps = targetAmp > 0 ? (uint16_t)(targetAmp * 10) : 0;
+  modbusWriteHoldingReg(REG_MAX_CURRENT, deciamps, [](bool success, uint16_t) {
+    online = success;
+  });
+}
+
+void wallboxInit() {
+  modbusInit();
+}
+
+void wallboxPoll() {
+  modbusLoop();
+
+  unsigned long now = millis();
+
+  if (now - lastPollMs >= MODBUS_POLL_INTERVAL_MS) {
+    lastPollMs = now;
+    modbusReadInputReg(REG_CHARGING_STATE, onChargingStateResult);
+    modbusReadInputReg(REG_POWER, onPowerResult);
+  }
+
+  if (now - lastWatchdogRefreshMs >= MODBUS_WATCHDOG_REFRESH_MS) {
+    lastWatchdogRefreshMs = now;
+    writeCurrentSetpoint();
+  }
+}
 
 void wallboxSetCurrent(int amps) {
   currentAmp = constrain(amps, MIN_AMPS, MAX_AMPS);
-  charging = true;
-  power = currentAmp * VOLTAGE;
+  targetAmp = currentAmp;
+  writeCurrentSetpoint();
 
   Serial.print("Charging current set: ");
   Serial.print(currentAmp);
@@ -18,9 +77,10 @@ void wallboxSetCurrent(int amps) {
 }
 
 void wallboxStop() {
-  charging = false;
   currentAmp = 0;
-  power = 0;
+  targetAmp = 0;
+  charging = false;
+  writeCurrentSetpoint();
 
   Serial.println("Charging stopped");
 }
@@ -33,6 +93,8 @@ String wallboxStatusJson() {
   json += currentAmp;
   json += ",\"power\":";
   json += power;
+  json += ",\"online\":";
+  json += online ? "true" : "false";
   json += "}";
   return json;
 }

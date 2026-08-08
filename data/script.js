@@ -28,7 +28,11 @@ async function updateStatus() {
     if (!res.ok) throw new Error('bad response');
     const data = await res.json();
 
-    setBadge(data.charging ? 'charging' : 'idle', data.charging ? 'Charging' : 'Ready / Idle');
+    if (data.online === false) {
+      setBadge('offline', 'No connection');
+    } else {
+      setBadge(data.charging ? 'charging' : 'idle', data.charging ? 'Charging' : 'Ready / Idle');
+    }
     els.currentAmp.textContent = data.current;
     els.power.textContent = data.power;
   } catch (e) {
