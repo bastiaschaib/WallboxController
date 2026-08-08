@@ -48,6 +48,43 @@ namespace {
     if (cb) cb(event == Modbus::EX_SUCCESS, value);
     return true;
   }
+
+  constexpr int MAX_PENDING32 = 2;
+
+  struct Pending32Request {
+    uint16_t transactionId = 0;
+    Modbus32ResultCallback cb = nullptr;
+    uint16_t value[2] = {0, 0};
+    bool active = false;
+  };
+
+  Pending32Request pending32[MAX_PENDING32];
+
+  Pending32Request* allocSlot32() {
+    for (auto &p : pending32) {
+      if (!p.active) return &p;
+    }
+    return nullptr;
+  }
+
+  Pending32Request* findSlot32(uint16_t transactionId) {
+    for (auto &p : pending32) {
+      if (p.active && p.transactionId == transactionId) return &p;
+    }
+    return nullptr;
+  }
+
+  bool onTransactionResult32(Modbus::ResultCode event, uint16_t transactionId, void*) {
+    Pending32Request* p = findSlot32(transactionId);
+    if (!p) return true; // stale/unknown transaction, ignore
+
+    Modbus32ResultCallback cb = p->cb;
+    uint32_t value = ((uint32_t)p->value[0] << 16) | p->value[1];
+    p->active = false;
+
+    if (cb) cb(event == Modbus::EX_SUCCESS, value);
+    return true;
+  }
 }
 
 void modbusInit() {
@@ -70,6 +107,24 @@ void modbusReadInputReg(uint16_t reg, ModbusResultCallback cb) {
   p->active = true;
   p->cb = cb;
   uint16_t trans = mb.readIreg(MODBUS_SLAVE_ID, reg, &p->value, 1, onTransactionResult);
+  if (trans == 0) {
+    p->active = false;
+    if (cb) cb(false, 0);
+    return;
+  }
+  p->transactionId = trans;
+}
+
+void modbusReadInputReg32(uint16_t reg, Modbus32ResultCallback cb) {
+  Pending32Request* p = allocSlot32();
+  if (!p) {
+    if (cb) cb(false, 0); // request table full, drop this poll cycle
+    return;
+  }
+
+  p->active = true;
+  p->cb = cb;
+  uint16_t trans = mb.readIreg(MODBUS_SLAVE_ID, reg, p->value, 2, onTransactionResult32);
   if (trans == 0) {
     p->active = false;
     if (cb) cb(false, 0);

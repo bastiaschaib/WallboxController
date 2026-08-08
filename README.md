@@ -77,7 +77,7 @@ All endpoints require HTTP Basic Auth.
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/` | Web dashboard |
-| GET | `/status` | JSON: `{ "charging": bool, "current": int, "power": int, "online": bool }` — `current` is the commanded setpoint, `power` is the wallbox's own measured value (register 14), `online` reflects Modbus reachability |
+| GET | `/status` | JSON: `{ "charging": bool, "current": int, "power": int, "energySincePowerOn": int, "energyTotal": int, "online": bool }` — `current` is the commanded setpoint, `power` is the wallbox's own measured value (register 14), the two energy fields are VAh (apparent energy, not true Wh — see [Modbus details](#modbus-details)) from registers 15/16 and 17/18, `online` reflects Modbus reachability |
 | GET | `/setcurrent?amps=<n>` | Set max charging current (clamped to `MIN_AMPS`–`MAX_AMPS` in `config.h`, currently 6–16 A); writes the wallbox's max-current register |
 | GET | `/stop` | Stop charging (writes max-current register to 0; the connector stays unlocked/ready) |
 
@@ -88,10 +88,11 @@ All endpoints require HTTP Basic Auth.
 
 ## Modbus details
 
-`wallbox.cpp` talks to three Heidelberg Energy Control registers (see the [official register table](https://www.amperfied.de/wp-content/uploads/2022/06/ModBus-Register-Tabelle.pdf) for the full map):
+`wallbox.cpp` talks to five Heidelberg Energy Control registers (see the [official register table](https://www.amperfied.de/wp-content/uploads/2022/06/ModBus-Register-Tabelle.pdf) for the full map):
 
 - **Input register 5** (charging state) — polled every `MODBUS_POLL_INTERVAL_MS`; only state `7` (C2: vehicle plugged, requesting, wallbox allows) counts as `charging`.
 - **Input register 14** (power, VA) — polled alongside register 5.
+- **Input registers 15+16** (energy since power-on, VAh) and **17+18** (energy since installation, VAh) — each a 32-bit value split across two registers (high word first), read via `modbusReadInputReg32()`. These are apparent energy (VAh), not true energy (Wh) — consistent with register 14 also being apparent power (VA), not real power — so don't use them for anything billing-related. Note register 15/16 resets whenever the wallbox itself resets, so it tracks the current session at best, not a true lifetime total (use 17/18 for that).
 - **Holding register 261** (max current, 0.1 A steps) — written immediately on `/setcurrent` and `/stop`, and re-written every `MODBUS_WATCHDOG_REFRESH_MS` regardless of user action. The wallbox has its own Modbus watchdog (register 257, default 15000 ms) that falls back to a configured Failsafe Current if no holding register is written in time — the periodic re-send keeps charging stable without requiring the watchdog timeout to be changed.
 
 `modbus.cpp` is a thin async transport wrapper around the [`modbus-esp8266`](https://github.com/emelianov/modbus-esp8266) library's `ModbusRTU` master (over a `SoftwareSerial` link, so the hardware UART stays free for the USB debug console); it is not Heidelberg-specific and could be reused for other Modbus RTU targets on the same bus.

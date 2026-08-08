@@ -3,6 +3,8 @@ const els = {
   stateText: document.querySelector('#chargingState .badge-text'),
   currentAmp: document.getElementById('currentAmp'),
   power: document.getElementById('power'),
+  energySession: document.getElementById('energySession'),
+  energyTotal: document.getElementById('energyTotal'),
   amps: document.getElementById('amps'),
   ampsValue: document.getElementById('ampsValue'),
   startBtn: document.getElementById('startBtn'),
@@ -35,6 +37,8 @@ async function updateStatus() {
     }
     els.currentAmp.textContent = data.current;
     els.power.textContent = data.power;
+    els.energySession.textContent = (data.energySincePowerOn / 1000).toFixed(2);
+    els.energyTotal.textContent = (data.energyTotal / 1000).toFixed(2);
   } catch (e) {
     setBadge('offline', 'No connection');
   }
