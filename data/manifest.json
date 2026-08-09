@@ -1,0 +1,11 @@
+{
+  "name": "Wallbox Control",
+  "short_name": "Wallbox",
+  "icons": [
+    { "src": "wallbox.png", "sizes": "600x600", "type": "image/png" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220"
+}

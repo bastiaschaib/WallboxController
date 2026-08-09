@@ -36,6 +36,8 @@ void webserverSetup() {
   // Static assets (no sensitive data)
   server.serveStatic("/style.css", LittleFS, "/style.css");
   server.serveStatic("/script.js", LittleFS, "/script.js");
+  server.serveStatic("/wallbox.png", LittleFS, "/wallbox.png");
+  server.serveStatic("/manifest.json", LittleFS, "/manifest.json");
 
   // Status API
   server.on("/status", []() {
