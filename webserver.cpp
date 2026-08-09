@@ -3,27 +3,16 @@
 #include <LittleFS.h>
 #include "webserver.h"
 #include "wallbox.h"
-#include "secrets.h"
 
 ESP8266WebServer server(80);
-
-static bool checkAuth() {
-  if (!server.authenticate(AUTH_USER, AUTH_PASSWORD)) {
-    server.requestAuthentication();
-    return false;
-  }
-  return true;
-}
 
 void webserverSetup() {
   if (!LittleFS.begin()) {
     Serial.println("LittleFS mount failed - did you upload the data/ folder?");
   }
 
-  // Web page (from data/index.html, auth-protected)
+  // Web page (from data/index.html)
   server.on("/", []() {
-    if (!checkAuth()) return;
-
     File f = LittleFS.open("/index.html", "r");
     if (!f) {
       server.send(500, "text/plain", "index.html not found on LittleFS - upload the data/ folder");
@@ -33,22 +22,22 @@ void webserverSetup() {
     f.close();
   });
 
-  // Static assets (no sensitive data)
-  server.serveStatic("/style.css", LittleFS, "/style.css");
-  server.serveStatic("/script.js", LittleFS, "/script.js");
-  server.serveStatic("/wallbox.png", LittleFS, "/wallbox.png");
-  server.serveStatic("/manifest.json", LittleFS, "/manifest.json");
+  // Static assets (no sensitive data). Cached client-side so a phone
+  // launching the home-screen app doesn't re-fetch everything from the
+  // ESP8266's slow WiFi/LittleFS on every open. CSS/JS get a shorter TTL
+  // since they're still actively changing; the icon/manifest barely change.
+  server.serveStatic("/style.css", LittleFS, "/style.css", "public, max-age=86400");
+  server.serveStatic("/script.js", LittleFS, "/script.js", "public, max-age=86400");
+  server.serveStatic("/wallbox.png", LittleFS, "/wallbox.png", "public, max-age=604800");
+  server.serveStatic("/manifest.json", LittleFS, "/manifest.json", "public, max-age=604800");
 
   // Status API
   server.on("/status", []() {
-    if (!checkAuth()) return;
     server.send(200, "application/json", wallboxStatusJson());
   });
 
   // Set charging current
   server.on("/setcurrent", []() {
-    if (!checkAuth()) return;
-
     if (server.hasArg("amps")) {
       wallboxSetCurrent(server.arg("amps").toInt());
     }
@@ -57,8 +46,6 @@ void webserverSetup() {
 
   // Stop
   server.on("/stop", []() {
-    if (!checkAuth()) return;
-
     wallboxStop();
     server.send(200, "text/plain", "OK");
   });

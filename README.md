@@ -2,7 +2,7 @@
 
 ESP8266 Wi-Fi wallbox controller — web UI + REST API for EV charging control, talking Modbus RTU directly to a Heidelberg Energy Control wallbox over a TTL-to-RS485 module wired straight to the ESP8266's GPIOs (no Node-RED, gateway box, or other middleware required).
 
-A small responsive web dashboard, served directly from the ESP8266's flash filesystem, that lets you monitor charging status and set the maximum charging current from a phone or PC on the local network. The HTTP API is protected with Basic Auth.
+A small responsive web dashboard, served directly from the ESP8266's flash filesystem, that lets you monitor charging status and set the maximum charging current from a phone or PC on the local network.
 
 > **Status:** the web UI/API talk to the real wallbox over Modbus (charging state, measured power, and the current setpoint are live). Control Pilot signaling, relay/contactor control, and current sensing are handled entirely by the wallbox itself — this firmware only reads/writes its Modbus registers. See [Roadmap](#roadmap) for what's still open.
 
@@ -10,8 +10,7 @@ A small responsive web dashboard, served directly from the ESP8266's flash files
 
 - Web dashboard (dark/light theme, responsive for mobile and desktop) served from LittleFS
 - REST API: live status (from the wallbox's own Modbus registers), set max charging current, stop charging
-- HTTP Basic Auth on the page and all state-changing endpoints
-- WiFi credentials and login credentials kept out of source control (`secrets.h`, gitignored)
+- WiFi credentials kept out of source control (`secrets.h`, gitignored)
 - Server-side clamping of the requested current to a safe configured range
 - Non-blocking Modbus RTU polling with a periodic watchdog-safe re-send of the current setpoint
 
@@ -21,12 +20,12 @@ A small responsive web dashboard, served directly from the ESP8266's flash files
 WallboxController/
 ├── WallboxController.ino   # setup()/loop(), wires the modules together
 ├── wifi.cpp / wifi.h        # WiFi connection
-├── webserver.cpp / webserver.h   # HTTP routes, Basic Auth
+├── webserver.cpp / webserver.h   # HTTP routes
 ├── wallbox.cpp / wallbox.h  # Heidelberg register map, charging state + logic
 ├── modbus.cpp / modbus.h    # Modbus RTU transport wrapper (RS485 serial link, async reads/writes)
 ├── config.h                  # charging parameters + Modbus RTU pin/timing settings
 ├── secrets.h.example         # template for credentials — copy to secrets.h
-├── secrets.h                 # WiFi + web UI credentials (gitignored, not committed)
+├── secrets.h                 # WiFi credentials (gitignored, not committed)
 └── data/                     # served from LittleFS at runtime
     ├── index.html
     ├── style.css
@@ -59,7 +58,7 @@ The wallbox's RTU line is fixed at **19200 baud, 8 data bits, 1 stop bit, even p
 
 1. Install the ESP8266 board package (Boards Manager → search "esp8266") and select your board under **Tools → Board**.
 2. Install the `modbus-esp8266` library (Library Manager → search "modbus-esp8266", by Andre Sarmento Barbosa / Alexander Emelianov).
-3. Copy `secrets.h.example` to `secrets.h` and fill in your WiFi SSID/password and the web UI login (`AUTH_USER` / `AUTH_PASSWORD`).
+3. Copy `secrets.h.example` to `secrets.h` and fill in your WiFi SSID/password.
 4. Wire the TTL-to-RS485 module per the [Hardware](#hardware) table above. If you use different GPIOs, update `MODBUS_RTU_RX_PIN` / `MODBUS_RTU_TX_PIN` / `MODBUS_RTU_DE_RE_PIN` in `config.h` to match.
 5. Open `WallboxController.ino` in the Arduino IDE.
 6. Upload the sketch (**Upload** button).
@@ -68,11 +67,9 @@ The wallbox's RTU line is fixed at **19200 baud, 8 data bits, 1 stop bit, even p
    - **Arduino IDE 2.x**: install the [arduino-littlefs-upload](https://github.com/earlephilhower/arduino-littlefs-upload) plugin, then use its upload command from the Tools menu.
    - Make sure **Tools → Flash Size** reserves space for a filesystem (e.g. `4MB (FS:2MB OTA:~1019KB)`), and close the Serial Monitor before uploading (it needs the port free).
 8. Open the Serial Monitor at 115200 baud to confirm WiFi connects, note the printed IP address, and watch for Modbus read logging.
-9. Visit that IP in a browser — you'll be prompted for the `AUTH_USER` / `AUTH_PASSWORD` you set in `secrets.h`.
+9. Visit that IP in a browser.
 
 ## API
-
-All endpoints require HTTP Basic Auth.
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -84,7 +81,7 @@ All endpoints require HTTP Basic Auth.
 ## Configuration
 
 - `config.h` — `MIN_AMPS`, `MAX_AMPS`, `VOLTAGE`; and the Modbus settings: `MODBUS_RTU_RX_PIN`, `MODBUS_RTU_TX_PIN`, `MODBUS_RTU_DE_RE_PIN`, `MODBUS_BAUD`, `MODBUS_SLAVE_ID`, `MODBUS_POLL_INTERVAL_MS`, `MODBUS_WATCHDOG_REFRESH_MS`.
-- `secrets.h` (not committed) — `WIFI_SSID`, `WIFI_PASSWORD`, `AUTH_USER`, `AUTH_PASSWORD`.
+- `secrets.h` (not committed) — `WIFI_SSID`, `WIFI_PASSWORD`.
 
 ## Modbus details
 
