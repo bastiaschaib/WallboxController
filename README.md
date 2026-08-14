@@ -69,18 +69,18 @@ The module's `A`/`B` terminal then goes to the wallbox's RS485 `A`/`B` (a separa
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/` | Web dashboard |
-| GET | `/status` | JSON status: `charging`, `current` (setpoint), `power`, `energySincePowerOn`, `energyTotal` (VAh, see [Modbus details](#modbus-details)), `online` |
+| GET | `/status` | JSON status: `charging`, `current` (setpoint), `power` (W), `energySincePowerOn`, `energyTotal` (Wh, see [Modbus details](#modbus-details)), `online` |
 | GET | `/setcurrent?amps=<n>` | Set max charging current (clamped to `MIN_AMPS`–`MAX_AMPS` in `config.h`) |
 | GET | `/stop` | Stop charging (writes max-current to 0; connector stays unlocked/ready) |
 
 ## Configuration
 
-- `config.h` — `MIN_AMPS`, `MAX_AMPS`, `VOLTAGE`, and `MODBUS_*` pin/baud/slave/timing settings.
+- `config.h` — `MIN_AMPS`, `MAX_AMPS`, and `MODBUS_*` pin/baud/slave/timing settings.
 - `secrets.h` (not committed) — `WIFI_SSID`, `WIFI_PASSWORD`.
 
 ## Modbus details
 
-`wallbox.cpp` runs a strict poll chain (state → power → session energy → total energy → setpoint re-write, one request at a time) over five Heidelberg registers (see the [official register table](https://www.amperfied.de/wp-content/uploads/2022/06/ModBus-Register-Tabelle.pdf)): input register 5 (charging state, state `7` = charging), 14 (power, VA), 15+16 and 17+18 (session/lifetime energy, VAh — apparent, not true Wh, so not billing-accurate), and holding register 261 (max current, 0.1 A steps), re-written every `MODBUS_WATCHDOG_REFRESH_MS` to satisfy the wallbox's own Modbus watchdog (register 257). If no transaction succeeds for `MODBUS_STUCK_RESET_MS`, the transport is torn down and reinitialized to clear a wedged link.
+`wallbox.cpp` runs a strict poll chain (state → power → session energy → total energy → setpoint re-write, one request at a time) over five Heidelberg registers (see the [official register table](https://www.amperfied.de/wp-content/uploads/2022/06/ModBus-Register-Tabelle.pdf)): input register 5 (charging state, state `7` = charging), 14 (power, reported as VA), 15+16 and 17+18 (session/lifetime energy, reported as VAh), and holding register 261 (max current, 0.1 A steps), re-written every `MODBUS_WATCHDOG_REFRESH_MS` to satisfy the wallbox's own Modbus watchdog (register 257). The wallbox reports apparent power/energy (VA/VAh); the firmware exposes these as W/Wh, assuming a power factor close to 1 (true for EV charging) — not precise enough for billing. If no transaction succeeds for `MODBUS_STUCK_RESET_MS`, the transport is torn down and reinitialized to clear a wedged link.
 
 `modbus.cpp` is a thin async wrapper around [`modbus-esp8266`](https://github.com/emelianov/modbus-esp8266)'s `ModbusRTU` master (over `SoftwareSerial`, keeping the hardware UART free for USB debug); not Heidelberg-specific.
 

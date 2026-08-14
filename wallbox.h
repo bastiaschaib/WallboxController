@@ -6,8 +6,8 @@ extern bool charging;
 extern int currentAmp;
 extern int power;
 extern bool online;
-extern uint32_t energySincePowerOn; // VAh, resets whenever the wallbox itself resets
-extern uint32_t energyTotal;        // VAh, since installation
+extern uint32_t energySincePowerOn; // Wh, resets whenever the wallbox itself resets
+extern uint32_t energyTotal;        // Wh, since installation
 
 void wallboxInit();
 void wallboxPoll();

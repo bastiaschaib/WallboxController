@@ -12,6 +12,10 @@ namespace {
   constexpr uint16_t REG_ENERGY_TOTAL = 17;    // input regs 17+18, FC04, VAh since installation, high word first
   constexpr uint16_t REG_MAX_CURRENT = 261;    // holding reg, FC03/FC06, 0.1A steps, 0 or 60-160
 
+  // The wallbox reports these as apparent power/energy (VA/VAh); we expose
+  // them as W/Wh since EV charging is resistive/DC-rectified with a power
+  // factor close to 1, making VA and W practically interchangeable here.
+
   // Only state 7 (C2 = vehicle plugged, requesting, wallbox allows) means current is actually flowing.
   constexpr uint16_t STATE_C2_CHARGING = 7;
 
