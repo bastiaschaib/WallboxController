@@ -52,7 +52,7 @@ async function updateStatus() {
     } else {
       setBadge(data.charging ? 'charging' : 'idle', data.charging ? 'Charging' : 'Ready / Idle');
       els.currentAmp.textContent = data.current;
-      els.power.textContent = data.power;
+      els.power.textContent = (data.power / 1000).toFixed(1);
       els.energySession.textContent = (data.energySincePowerOn / 1000).toFixed(2);
     }
     setToggleButton(data.charging === true);
