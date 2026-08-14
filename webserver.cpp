@@ -22,12 +22,13 @@ void webserverSetup() {
     f.close();
   });
 
-  // Static assets (no sensitive data). Cached client-side so a phone
-  // launching the home-screen app doesn't re-fetch everything from the
-  // ESP8266's slow WiFi/LittleFS on every open. CSS/JS get a shorter TTL
-  // since they're still actively changing; the icon/manifest barely change.
-  server.serveStatic("/style.css", LittleFS, "/style.css", "public, max-age=86400");
-  server.serveStatic("/script.js", LittleFS, "/script.js", "public, max-age=86400");
+  // Static assets (no sensitive data). CSS/JS are still actively changing
+  // and there's no cache-busting (no build step, no versioned filenames),
+  // so caching them client-side risks a phone silently running a stale
+  // script.js after an update - not worth the saved round trip on a local
+  // network. The icon/manifest barely change, so those stay cached.
+  server.serveStatic("/style.css", LittleFS, "/style.css", "no-store");
+  server.serveStatic("/script.js", LittleFS, "/script.js", "no-store");
   server.serveStatic("/wallbox.png", LittleFS, "/wallbox.png", "public, max-age=604800");
   server.serveStatic("/manifest.json", LittleFS, "/manifest.json", "public, max-age=604800");
 
