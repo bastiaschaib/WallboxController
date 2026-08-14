@@ -14,6 +14,31 @@ namespace {
 
   // Only state 7 (C2 = vehicle plugged, requesting, wallbox allows) means current is actually flowing.
   constexpr uint16_t STATE_C2_CHARGING = 7;
+
+  // The RTU master only ever has one transaction in flight, so a poll cycle
+  // has to be a strict chain rather than firing all reads at once - anything
+  // fired while the previous one is still outstanding gets silently dropped
+  // before it even reaches the wire.
+  enum class PollStep { Idle, State, Power, EnergyPowerOn, EnergyTotal, Write };
+  PollStep pollStep = PollStep::Idle;
+  bool writeDueThisCycle = false;
+  bool chainWriteInFlight = false; // guards against an unrelated manual write advancing the chain
+
+  // A completed step must not issue the next request from inside its own
+  // callback: the library invokes our callback before it resets its
+  // "transaction in flight" state, so a send from in there is silently
+  // dropped as busy. Instead just flag it and let wallboxPoll() advance the
+  // chain on its next tick, once the library has actually gone idle.
+  bool advancePending = false;
+
+  constexpr unsigned long MODBUS_STUCK_RESET_MS = 10000; // no successful transaction for this long -> reset transport
+  unsigned long lastSuccessMs = 0;
+
+  void startNextStep();
+
+  void noteResult(bool success) {
+    if (success) lastSuccessMs = millis();
+  }
 }
 
 bool charging = false;
@@ -33,10 +58,12 @@ static void onChargingStateResult(bool success, uint16_t value) {
   if (success) {
     charging = (value == STATE_C2_CHARGING);
   }
+  noteResult(success);
   Serial.print("[modbus] read state reg ");
   Serial.print(REG_CHARGING_STATE);
   Serial.print(": ");
   Serial.println(success ? String(value) : "FAILED");
+  advancePending = true;
 }
 
 static void onPowerResult(bool success, uint16_t value) {
@@ -44,60 +71,118 @@ static void onPowerResult(bool success, uint16_t value) {
   if (success) {
     power = value;
   }
+  noteResult(success);
   Serial.print("[modbus] read power reg ");
   Serial.print(REG_POWER);
   Serial.print(": ");
   Serial.println(success ? String(value) : "FAILED");
+  advancePending = true;
 }
 
 static void onEnergyPowerOnResult(bool success, uint32_t value) {
   if (success) energySincePowerOn = value;
+  noteResult(success);
   Serial.print("[modbus] read energy-since-poweron regs ");
   Serial.print(REG_ENERGY_POWERON);
   Serial.print(": ");
   Serial.println(success ? String(value) : "FAILED");
+  advancePending = true;
 }
 
 static void onEnergyTotalResult(bool success, uint32_t value) {
   if (success) energyTotal = value;
+  noteResult(success);
   Serial.print("[modbus] read energy-total regs ");
   Serial.print(REG_ENERGY_TOTAL);
   Serial.print(": ");
   Serial.println(success ? String(value) : "FAILED");
+  advancePending = true;
+}
+
+static void onWriteCurrentResult(bool success, uint16_t value) {
+  online = success;
+  noteResult(success);
+  Serial.print("[modbus] write current reg ");
+  Serial.print(REG_MAX_CURRENT);
+  Serial.print(" = ");
+  Serial.print(value);
+  Serial.println(success ? " OK" : " FAILED");
+
+  // Only advance the poll chain if this write was the one the chain itself
+  // issued - a manual wallboxSetCurrent()/wallboxStop() write completing
+  // must not push a mid-chain read state forward out of turn.
+  if (chainWriteInFlight) {
+    chainWriteInFlight = false;
+    advancePending = true;
+  }
 }
 
 static void writeCurrentSetpoint() {
   uint16_t deciamps = targetAmp > 0 ? (uint16_t)(targetAmp * 10) : 0;
-  modbusWriteHoldingReg(REG_MAX_CURRENT, deciamps, [](bool success, uint16_t value) {
-    online = success;
-    Serial.print("[modbus] write current reg ");
-    Serial.print(REG_MAX_CURRENT);
-    Serial.print(" = ");
-    Serial.print(value);
-    Serial.println(success ? " OK" : " FAILED");
-  });
+  modbusWriteHoldingReg(REG_MAX_CURRENT, deciamps, onWriteCurrentResult);
+}
+
+namespace {
+  void startNextStep() {
+    switch (pollStep) {
+      case PollStep::State:
+        pollStep = PollStep::Power;
+        modbusReadInputReg(REG_POWER, onPowerResult);
+        break;
+      case PollStep::Power:
+        pollStep = PollStep::EnergyPowerOn;
+        modbusReadInputReg32(REG_ENERGY_POWERON, onEnergyPowerOnResult);
+        break;
+      case PollStep::EnergyPowerOn:
+        pollStep = PollStep::EnergyTotal;
+        modbusReadInputReg32(REG_ENERGY_TOTAL, onEnergyTotalResult);
+        break;
+      case PollStep::EnergyTotal:
+        if (writeDueThisCycle) {
+          pollStep = PollStep::Write;
+          chainWriteInFlight = true;
+          writeCurrentSetpoint();
+        } else {
+          pollStep = PollStep::Idle;
+        }
+        break;
+      case PollStep::Write:
+      case PollStep::Idle:
+        pollStep = PollStep::Idle;
+        break;
+    }
+  }
 }
 
 void wallboxInit() {
   modbusInit();
+  lastSuccessMs = millis(); // start the stuck-link countdown from boot, not just after the first success
 }
 
 void wallboxPoll() {
   modbusLoop();
 
-  unsigned long now = millis();
-
-  if (now - lastPollMs >= MODBUS_POLL_INTERVAL_MS) {
-    lastPollMs = now;
-    modbusReadInputReg(REG_CHARGING_STATE, onChargingStateResult);
-    modbusReadInputReg(REG_POWER, onPowerResult);
-    modbusReadInputReg32(REG_ENERGY_POWERON, onEnergyPowerOnResult);
-    modbusReadInputReg32(REG_ENERGY_TOTAL, onEnergyTotalResult);
+  if (advancePending) {
+    advancePending = false;
+    startNextStep();
   }
 
-  if (now - lastWatchdogRefreshMs >= MODBUS_WATCHDOG_REFRESH_MS) {
-    lastWatchdogRefreshMs = now;
-    writeCurrentSetpoint();
+  unsigned long now = millis();
+
+  if (pollStep == PollStep::Idle && now - lastPollMs >= MODBUS_POLL_INTERVAL_MS) {
+    lastPollMs = now;
+    writeDueThisCycle = (now - lastWatchdogRefreshMs >= MODBUS_WATCHDOG_REFRESH_MS);
+    if (writeDueThisCycle) lastWatchdogRefreshMs = now;
+    pollStep = PollStep::State;
+    modbusReadInputReg(REG_CHARGING_STATE, onChargingStateResult);
+  }
+
+  if (now - lastSuccessMs >= MODBUS_STUCK_RESET_MS) {
+    Serial.println("[modbus] no successful transaction in a while, resetting link");
+    modbusReset();
+    pollStep = PollStep::Idle;
+    chainWriteInFlight = false;
+    lastSuccessMs = now; // avoid immediately re-triggering before the next cycle gets a chance
   }
 }
 

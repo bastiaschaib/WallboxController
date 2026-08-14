@@ -12,6 +12,13 @@ typedef void (*Modbus32ResultCallback)(bool success, uint32_t value);
 void modbusInit();
 void modbusLoop();
 
+// Recovers a wedged transport: the underlying RTU master only tracks one
+// in-flight transaction and only re-arms it once its RX buffer is empty, so
+// stray bytes on the bus (noise, DE/RE glitches) can leave it permanently
+// stuck with no way to send again. Call this if nothing has succeeded in a
+// while; it discards any in-flight request and reinitializes the link.
+void modbusReset();
+
 void modbusReadInputReg(uint16_t reg, ModbusResultCallback cb);
 void modbusWriteHoldingReg(uint16_t reg, uint16_t value, ModbusResultCallback cb = nullptr);
 

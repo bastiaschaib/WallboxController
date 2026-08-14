@@ -5,7 +5,7 @@
 // Charging parameters
 constexpr int MIN_AMPS = 6;
 constexpr int MAX_AMPS = 16;
-constexpr int VOLTAGE = 230;
+constexpr int VOLTAGE = 400;
 
 // Modbus RTU over a TTL-to-RS485 module, wired directly to the ESP8266
 // (module RO/DI/RE+DE -> ESP8266 GPIOs; module A/B -> wallbox RS485 A/B).
