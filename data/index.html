@@ -24,34 +24,37 @@
       <h1>Wallbox</h1>
     </div>
 
-    <span id="chargingState" class="badge idle">
-      <span class="dot"></span>
-      <span class="badge-text" aria-live="polite">Loading&hellip;</span>
-    </span>
+    <div class="header-right">
+      <button id="langToggle" class="lang-btn" aria-label="Switch language">EN</button>
+      <span id="chargingState" class="badge idle">
+        <span class="dot"></span>
+        <span class="badge-text" data-i18n="loading" aria-live="polite">Loading&hellip;</span>
+      </span>
+    </div>
   </header>
 
   <section class="stats">
     <div class="stat">
-      <span class="stat-label">Current</span>
+      <span class="stat-label" data-i18n="statCurrent">Current</span>
       <span class="stat-value"><span id="currentAmp">--</span> <small>A</small></span>
     </div>
     <div class="stat">
-      <span class="stat-label">Power</span>
+      <span class="stat-label" data-i18n="statPower">Power</span>
       <span class="stat-value"><span id="power">--</span> <small>kW</small></span>
     </div>
     <div class="stat">
-      <span class="stat-label">Session energy</span>
+      <span class="stat-label" data-i18n="statSessionEnergy">Session energy</span>
       <span class="stat-value"><span id="energySession">--</span> <small>kWh</small></span>
     </div>
     <div class="stat">
-      <span class="stat-label">Total energy</span>
+      <span class="stat-label" data-i18n="statTotalEnergy">Total energy</span>
       <span class="stat-value"><span id="energyTotal">--</span> <small>kWh</small></span>
     </div>
   </section>
 
   <section class="slider-section">
     <div class="slider-label">
-      <label for="amps">Max. charging current</label>
+      <label for="amps" data-i18n="sliderLabel">Max. charging current</label>
       <span class="slider-value"><span id="ampsValue">10</span> A</span>
     </div>
     <input type="range" id="amps" min="6" max="16" value="10" step="1">

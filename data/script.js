@@ -10,19 +10,80 @@ const els = {
   toggleBtn: document.getElementById('toggleBtn'),
   toggleIcon: document.getElementById('toggleIcon'),
   toggleText: document.getElementById('toggleText'),
+  langToggle: document.getElementById('langToggle'),
 };
 
 const ICON_START = '<path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="currentColor"/>';
 const ICON_STOP = '<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>';
 
+const translations = {
+  en: {
+    title: 'Wallbox Control',
+    loading: 'Loading…',
+    offline: 'No connection',
+    charging: 'Charging',
+    idle: 'Ready / Idle',
+    statCurrent: 'Current',
+    statPower: 'Power',
+    statSessionEnergy: 'Session energy',
+    statTotalEnergy: 'Total energy',
+    sliderLabel: 'Max. charging current',
+    startCharging: 'Start charging',
+    stopCharging: 'Stop charging',
+  },
+  de: {
+    title: 'Wallbox-Steuerung',
+    loading: 'Lädt…',
+    offline: 'Keine Verbindung',
+    charging: 'Lädt',
+    idle: 'Bereit / Leerlauf',
+    statCurrent: 'Strom',
+    statPower: 'Leistung',
+    statSessionEnergy: 'Sitzungsenergie',
+    statTotalEnergy: 'Gesamtenergie',
+    sliderLabel: 'Max. Ladestrom',
+    startCharging: 'Laden starten',
+    stopCharging: 'Laden stoppen',
+  },
+};
+
+const LANG_STORAGE_KEY = 'wallbox-lang';
+
+function detectDefaultLang() {
+  return navigator.language && navigator.language.toLowerCase().startsWith('de') ? 'de' : 'en';
+}
+
+let lang = localStorage.getItem(LANG_STORAGE_KEY) || detectDefaultLang();
 let isCharging = false;
+let lastBadgeMode = null;
+
+function t(key) {
+  return translations[lang][key];
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = lang;
+  document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  els.langToggle.textContent = lang === 'en' ? 'DE' : 'EN';
+}
+
+function setLang(newLang) {
+  lang = newLang;
+  localStorage.setItem(LANG_STORAGE_KEY, lang);
+  applyStaticTranslations();
+  if (lastBadgeMode) setBadge(lastBadgeMode);
+  setToggleButton(isCharging);
+}
 
 function setToggleButton(charging) {
   isCharging = charging;
   els.toggleBtn.classList.toggle('btn-primary', !charging);
   els.toggleBtn.classList.toggle('btn-danger', charging);
   els.toggleIcon.innerHTML = charging ? ICON_STOP : ICON_START;
-  els.toggleText.textContent = charging ? 'Stop charging' : 'Start charging';
+  els.toggleText.textContent = t(charging ? 'stopCharging' : 'startCharging');
 }
 
 function updateSliderFill() {
@@ -32,10 +93,11 @@ function updateSliderFill() {
   els.amps.style.setProperty('--fill', pct + '%');
 }
 
-function setBadge(mode, text) {
+function setBadge(mode) {
+  lastBadgeMode = mode;
   els.state.classList.remove('idle', 'charging', 'offline');
   els.state.classList.add(mode);
-  els.stateText.textContent = text;
+  els.stateText.textContent = t(mode);
 }
 
 async function updateStatus() {
@@ -45,12 +107,12 @@ async function updateStatus() {
     const data = await res.json();
 
     if (data.online === false) {
-      setBadge('offline', 'No connection');
+      setBadge('offline');
       els.currentAmp.textContent = '--';
       els.power.textContent = '--';
       els.energySession.textContent = '--';
     } else {
-      setBadge(data.charging ? 'charging' : 'idle', data.charging ? 'Charging' : 'Ready / Idle');
+      setBadge(data.charging ? 'charging' : 'idle');
       els.currentAmp.textContent = data.current;
       els.power.textContent = (data.power / 1000).toFixed(1);
       els.energySession.textContent = (data.energySincePowerOn / 1000).toFixed(2);
@@ -58,7 +120,7 @@ async function updateStatus() {
     setToggleButton(data.charging === true);
     els.energyTotal.textContent = (data.energyTotal / 1000).toFixed(2);
   } catch (e) {
-    setBadge('offline', 'No connection');
+    setBadge('offline');
   }
 }
 
@@ -91,7 +153,9 @@ els.amps.addEventListener('input', () => {
 });
 
 els.toggleBtn.addEventListener('click', toggleCharging);
+els.langToggle.addEventListener('click', () => setLang(lang === 'en' ? 'de' : 'en'));
 
+applyStaticTranslations();
 updateSliderFill();
 updateStatus();
 setInterval(updateStatus, 3000);

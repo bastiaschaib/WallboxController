@@ -7,6 +7,7 @@ ESP8266 Wi-Fi controller for a Heidelberg Energy Control wallbox — a web dashb
 ## Features
 
 - Responsive dark/light web dashboard, served from LittleFS, installable as a home-screen app (icon + manifest)
+- EN/DE language toggle (client-side, persisted in `localStorage`)
 - REST API: live status, set max charging current, stop charging
 - WiFi credentials kept out of source control (`secrets.h`, gitignored)
 - Server-side clamping of requested current to a safe range
