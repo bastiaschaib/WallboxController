@@ -16,8 +16,46 @@ namespace {
   // them as W/Wh since EV charging is resistive/DC-rectified with a power
   // factor close to 1, making VA and W practically interchangeable here.
 
-  // Only state 7 (C2 = vehicle plugged, requesting, wallbox allows) means current is actually flowing.
-  constexpr uint16_t STATE_C2_CHARGING = 7;
+  // Raw charging-state register values. The car letter (A/B/C) says whether/how
+  // a vehicle is plugged in; the digit (1/2) says whether the wallbox is
+  // currently authorizing current flow - so C2 is the only value where
+  // current actually flows. 9-11 (E/F/comms error) are lumped into Error.
+  constexpr uint16_t STATE_A1 = 2;
+  constexpr uint16_t STATE_A2 = 3;
+  constexpr uint16_t STATE_B1 = 4;
+  constexpr uint16_t STATE_B2 = 5;
+  constexpr uint16_t STATE_C1 = 6;
+  constexpr uint16_t STATE_C2 = 7;
+  constexpr uint16_t STATE_DERATING = 8;
+
+  ChargingState rawStateToChargingState(uint16_t value) {
+    switch (value) {
+      case STATE_A1:
+      case STATE_A2:
+        return ChargingState::Disconnected;
+      case STATE_B1:
+      case STATE_B2:
+      case STATE_C1:
+        return ChargingState::Connected;
+      case STATE_C2:
+        return ChargingState::Charging;
+      case STATE_DERATING:
+        return ChargingState::Derating;
+      default:
+        return ChargingState::Error;
+    }
+  }
+
+  const char* chargingStateToString(ChargingState s) {
+    switch (s) {
+      case ChargingState::Disconnected: return "disconnected";
+      case ChargingState::Connected: return "connected";
+      case ChargingState::Charging: return "charging";
+      case ChargingState::Derating: return "derating";
+      case ChargingState::Error: return "error";
+    }
+    return "error";
+  }
 
   // The RTU master only ever has one transaction in flight, so a poll cycle
   // has to be a strict chain rather than firing all reads at once - anything
@@ -45,7 +83,7 @@ namespace {
   }
 }
 
-bool charging = false;
+ChargingState state = ChargingState::Disconnected;
 int currentAmp = 0;
 int power = 0;
 bool online = false;
@@ -60,7 +98,7 @@ static unsigned long lastWatchdogRefreshMs = 0;
 static void onChargingStateResult(bool success, uint16_t value) {
   online = success;
   if (success) {
-    charging = (value == STATE_C2_CHARGING);
+    state = rawStateToChargingState(value);
   }
   noteResult(success);
   Serial.print("[modbus] read state reg ");
@@ -203,17 +241,18 @@ void wallboxSetCurrent(int amps) {
 void wallboxStop() {
   currentAmp = 0;
   targetAmp = 0;
-  charging = false;
   writeCurrentSetpoint();
+  // `state` is left alone here - whether the wallbox is now Connected or
+  // Disconnected depends on the actual car, which only the next poll knows.
 
   Serial.println("Charging stopped");
 }
 
 String wallboxStatusJson() {
   String json = "{";
-  json += "\"charging\":";
-  json += charging ? "true" : "false";
-  json += ",\"current\":";
+  json += "\"state\":\"";
+  json += chargingStateToString(state);
+  json += "\",\"current\":";
   json += currentAmp;
   json += ",\"power\":";
   json += power;

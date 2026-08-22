@@ -21,8 +21,11 @@ const translations = {
     title: 'Wallbox Control',
     loading: 'Loading…',
     offline: 'No connection',
+    disconnected: 'No vehicle',
+    connected: 'Ready',
     charging: 'Charging',
-    idle: 'Ready / Idle',
+    derating: 'Derating',
+    error: 'Error',
     statCurrent: 'Current',
     statPower: 'Power',
     statSessionEnergy: 'Session energy',
@@ -35,8 +38,11 @@ const translations = {
     title: 'Wallbox-Steuerung',
     loading: 'Lädt…',
     offline: 'Keine Verbindung',
+    disconnected: 'Kein Fahrzeug',
+    connected: 'Bereit',
     charging: 'Lädt',
-    idle: 'Bereit / Leerlauf',
+    derating: 'Gedrosselt',
+    error: 'Fehler',
     statCurrent: 'Strom',
     statPower: 'Leistung',
     statSessionEnergy: 'Sitzungsenergie',
@@ -95,7 +101,7 @@ function updateSliderFill() {
 
 function setBadge(mode) {
   lastBadgeMode = mode;
-  els.state.classList.remove('idle', 'charging', 'offline');
+  els.state.classList.remove('disconnected', 'connected', 'charging', 'derating', 'error', 'offline');
   els.state.classList.add(mode);
   els.stateText.textContent = t(mode);
 }
@@ -112,12 +118,12 @@ async function updateStatus() {
       els.power.textContent = '--';
       els.energySession.textContent = '--';
     } else {
-      setBadge(data.charging ? 'charging' : 'idle');
+      setBadge(data.state);
       els.currentAmp.textContent = data.current;
       els.power.textContent = (data.power / 1000).toFixed(1);
       els.energySession.textContent = (data.energySincePowerOn / 1000).toFixed(2);
     }
-    setToggleButton(data.charging === true);
+    setToggleButton(data.state === 'charging');
     els.energyTotal.textContent = (data.energyTotal / 1000).toFixed(2);
   } catch (e) {
     setBadge('offline');

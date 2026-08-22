@@ -11,6 +11,8 @@
   --green-bg: rgba(22, 163, 74, 0.12);
   --red: #dc2626;
   --red-bg: rgba(220, 38, 38, 0.1);
+  --amber: #d97706;
+  --amber-bg: rgba(217, 119, 6, 0.12);
   --gray-bg: rgba(100, 116, 139, 0.12);
   --track: #e2e8f0;
   --shadow: 0 20px 40px -20px rgba(15, 23, 42, 0.25);
@@ -32,6 +34,8 @@
     --green-bg: rgba(74, 222, 128, 0.14);
     --red: #f87171;
     --red-bg: rgba(248, 113, 113, 0.14);
+    --amber: #fbbf24;
+    --amber-bg: rgba(251, 191, 36, 0.14);
     --gray-bg: rgba(148, 163, 184, 0.14);
     --track: #253048;
     --shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.6);
@@ -166,7 +170,8 @@ h1 {
   background: currentColor;
 }
 
-.badge.idle {
+.badge.disconnected,
+.badge.connected {
   background: var(--gray-bg);
   color: var(--text-muted);
 }
@@ -180,6 +185,12 @@ h1 {
   animation: pulse 1.4s ease-in-out infinite;
 }
 
+.badge.derating {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.badge.error,
 .badge.offline {
   background: var(--red-bg);
   color: var(--red);
